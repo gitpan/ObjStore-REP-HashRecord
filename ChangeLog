@@ -1,0 +1,12 @@
+1998-09-08  Joshua Pritikin  <joshua.pritikin@db.com>
+
+	* os_class method declaration is now optional.
+
+1998-08-31  Joshua Pritikin  <joshua.pritikin@db.com>
+
+	* Use PERL5PREFIX to install into a different directory tree.
+
+1998-08-19  Joshua Pritikin  <joshua@eq1062.wks.na.deuba.com>
+
+	* osp_str stores 'undef'
+

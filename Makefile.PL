@@ -5,7 +5,11 @@ use ExtUtils::MakeMaker;
 use ObjStore::MakeMaker qw(add_os_args);
 require "./HashRecord.pm";
 
+my @PREFIX = (PREFIX => $ENV{PERL5PREFIX})
+    if exists $ENV{PERL5PREFIX};
+
 my %args = (
+	    @PREFIX,
 	    NAME         => 'ObjStore::REP::HashRecord',
 	    VERSION_FROM => './HashRecord.pm',
 	    PL_FILES     => { 'gen_lib.PL' => "osp_hashrecord.h librecord.c" },

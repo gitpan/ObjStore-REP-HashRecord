@@ -72,9 +72,15 @@ sub print_fetch {
 		    out "dSP;";
 		    out "XPUSHs(sv_2mortal(newSViv(*fp)));";
 		} elsif ($t =~ m/^osp_str(\d+)$/) {
-		    out "STRLEN len; char *str = fp->get(&len);";
 		    out "dSP;";
-		    out "XPUSHs(len? sv_2mortal(newSVpvn(str,len)) : &PL_sv_no);";
+		    out "if (fp->is_undef())";
+		    indent sub { out "XPUSHs(&sv_undef);" };
+		    out "else {";
+		    indent sub {
+			out "STRLEN len; char *str = fp->get(&len);";
+			out "XPUSHs(len? sv_2mortal(newSVpvn(str,len)) : &PL_sv_no);";
+		    };
+		    out "}";
 		} elsif ($t =~ m/^double|float$/) {
 		    out "dSP;";
 		    out "XPUSHs(sv_2mortal(newSVnv(*fp)));";
@@ -127,9 +133,15 @@ sub print_store {
 		} elsif ($t =~ m/^ os_int(\d+) $/x) {
 		    out "*fp = SvIV(nval);";
 		} elsif ($t =~ m/^osp_str(\d+)$/) {
-		    out "STRLEN len; char *pv = SvPV(nval, len);";
-		    out qq[if (len > $1) warn("truncating string from length %d to %d", len, $1);];
-		    out "fp->set(pv,len);";
+		    out "if (!SvOK(nval))";
+		    indent sub { out "fp->set_undef();" };
+		    out "else {";
+		    indent sub {
+			out "STRLEN len; char *pv = SvPV(nval, len);";
+			out qq[if (len > $1) warn("Truncating string from length %d to %d", len, $1);];
+			out "fp->set(pv,len);";
+		    };
+		    out "}";
 		} elsif ($t =~ m/^double|float$/) {
 		    out "*fp = SvNV(nval);";
 		} elsif ($t =~ m/^char$/) {
@@ -214,9 +226,15 @@ sub print_traverse2 {
 		    out "HR_mod_field(exam, fi);";
 		    out "ret->s((os_int32) *fp);";
 		} elsif ($t =~ m/^osp_str(\d+)$/) {
-		    out "HR_mod_field(exam, fi);";
-		    out "STRLEN len; char *str = fp->get(&len);";
-		    out "ret->s(str, len);";
+		    out "if (fp->is_undef())";
+		    indent sub { out "ret->set_undef();"; };
+		    out "else {";
+		    indent sub {
+			out "HR_mod_field(exam, fi);";
+			out "STRLEN len; char *str = fp->get(&len);";
+			out "ret->s(str, len);";
+		    };
+		    out "}";
 		} elsif ($t =~ m/^double|float$/) {
 		    out "HR_mod_field(exam, fi);";
 		    out "ret->s((double) *fp);";

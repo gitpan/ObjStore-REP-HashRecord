@@ -47,6 +47,7 @@ print $C q[extern "C" {
 #include "perl.h"
 #include "XSUB.h"
 }
+#include <stddef.h>
 ];
 print $C qq[#include "$input.h"\n\n];
 
@@ -55,7 +56,7 @@ my $class_RE = '(class|struct)\s+';
 my %T;
 for (c_types) { $T{$_} = 1 }
 
-my %opt = (readonly => 0, index => 1);
+my %opt = (readonly => 0, index => 1, os_class => 1);
 my $Class;
 my $NextId;
 my $fallback;
@@ -63,6 +64,8 @@ my @F;
 my $l;
 while ($l = <$rec>) {
     if ($l =~ m/$class_RE (\w+) \s [^;\{]* \{ /x) {
+	print $H "// HR options: ".join(' ', map { ($opt{$_}?'':'!') . $_ }
+					sort keys %opt)."\n";
 	$Class = $2;
 	$NextId = 0;
 	next
@@ -85,10 +88,14 @@ while ($l = <$rec>) {
 		$opt{readonly} = ! $1;
 	    } elsif ($o =~ m/^(\!)?index$/) {
 		$opt{index} = ! $1;
+	    } elsif ($o =~ m/^(\!)?os_class$/) {
+		$opt{os_class} = ! $1;
 	    } else {
 		warn "unknown option '$o' ignored";
 	    }
 	}
+	$l = '';
+	next;
     }
     next if !$Class;
     next if $l =~ m/^\s*$/;
@@ -158,6 +165,7 @@ sub generate {
 		if $opt{index};
 	}
     }
+    my $osc = $opt{os_class}? '':'//';
 
     print $H <<END;
 
@@ -174,7 +182,7 @@ sub generate {
   virtual void HR_mod_field(osp_pathexam &exam, int xx);
 
   // you must implement:
-  //virtual char *os_class(STRLEN *len);
+  $osc virtual char *os_class(STRLEN *len);
 END
 
     # FIELD SPEC TABLE
@@ -183,7 +191,7 @@ END
 		  map { "{ ".join(", ",
 				  '"'.$_->{name}.'"',
 				  length $_->{name},
-				  "(int) &(($class *)0)->$_->{cname}",
+				  "offsetof($class, $_->{cname})",
 				  "FT_".$_->{type})." }" }
 		  sort { $a->{id} <=> $b->{id} } @real);
     print $C "\n};\n";
@@ -200,7 +208,7 @@ END
     print $C "int $class\::HR_get_num_fields() { return HR_num_fields; }\n";
     print $C "$Fspec * $class\::HR_get_field_spec(int xx)\n{ return &HR_spec[xx]; }\n";
     if ($fallback) {
-	print $H "OSSVPV *HR_get_fallback();\n";
+	print $H "  OSSVPV *HR_get_fallback();\n";
 	print $C "OSSVPV *$class\::HR_get_fallback() { return $fallback; }\n";
     }
     print $C "int $class\::HR_mod_field(int xx)\n";
@@ -251,7 +259,7 @@ END
 		print $C "    if (klen == $_->{len} && memcmp(key, HR_spec[$x].key, $_->{len}) == 0) return $x;\n";
 	    } else {
 		print $C qq[    if (klen == $_->{len} && memcmp(key, "$_->{name}", $_->{len}) == 0) {\n];
-		print $C qq[      warn("Please use '$_->{name}' instead of '$_->{alias}'");\n];
+		print $C qq[      warn("Please use '$_->{alias}' instead of '$_->{name}'");\n];
 		print $C "      return $x;\n";
 		print $C "    }\n";
 	    }

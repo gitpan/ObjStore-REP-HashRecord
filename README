@@ -35,3 +35,8 @@ We need to balance two opposing desires:
 2. Try to minimize the bulk of schema and object code needed for
 ongoing backward compatibility.
 
+
+IMPLEMENTATION:
+
+Just like a relational database.  Records are encoded by field offset
+and type, with all the manipulation being generic.
