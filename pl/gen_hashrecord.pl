@@ -235,11 +235,13 @@ END
 	print $C "  } else if (exam.get_mode() == 'u') HR_indexed.clr(xx);\n";
     } else {
 	# !index
+	print $C "  if (exam.get_mode() == 's') {\n";
 	if ($opt{readonly}) {
-	    print $C "  HR_readonly.set(xx);\n";
+	    print $C "    HR_readonly.set(xx);\n";
 	} else {
-	    print $C "  OSPvFLAGS(this) |= OSPV_phrREADONLY;\n";
+	    print $C "    OSPvFLAGS(this) |= OSPV_phrREADONLY;\n";
 	}
+	print $C "  }\n";
     }
     print $C "}\n";
     print $C "int $class\::HR_key_2field(char *key, int klen)\n";

@@ -8,15 +8,15 @@ PREREQUISITES:
 
 WHAT THE HECK IS THIS?
 
-  A code generator for highly optimized databases.
+  A code generator for highly optimized database records.
 
 
 DESCRIPTION:
 
 The achievement of top database efficiency demands the use of C++ to
 optimize space requirements and access times of perl data.
-Unfortunately, once we step down from perl to C++ things get
-complicated.
+Unfortunately, once we step down from perl to C++ things get a lot
+more complicated (or at least messy).
 
 Suddenly, each database brings with it the baggage of an application
 specific schema and the corresponding C++ support code.  Even worse,
@@ -39,4 +39,4 @@ ongoing backward compatibility.
 IMPLEMENTATION:
 
 Just like a relational database.  Records are encoded by field offset
-and type, with all the manipulation being generic.
+and type, with all the data manipulations being generic.

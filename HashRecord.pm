@@ -3,10 +3,8 @@ package ObjStore::REP::HashRecord;
 use base 'Exporter';
 use ObjStore::MakeMaker qw(add_os_args);
 use vars qw($VERSION @EXPORT_OK $Fspec %align);
-$VERSION = '0.91';
-@EXPORT_OK = qw($VERSION &API_VERSION &hrec_args &c_types $Fspec %align);
-
-sub API_VERSION() { '01' };     #do not edit!!
+$VERSION = '0.94';
+@EXPORT_OK = qw($VERSION &hrec_args &c_types $Fspec %align);
 
 $Fspec = "osp_hashrec_field_spec";
 
@@ -19,8 +17,7 @@ sub hrec_args {
     $arg{INC} .= " -I$sitearch/auto/ObjStore/REP/HashRecord";
     $arg{LIBS} ||= [''];
     for (@{$arg{LIBS}}) {
-	$_ .= " -L$sitearch/auto/ObjStore/REP/HashRecord -lHashRecord".
-	    API_VERSION();
+	$_ .= " -L$sitearch/auto/ObjStore/REP/HashRecord -lHashRecord"
     }
     %arg;
 }

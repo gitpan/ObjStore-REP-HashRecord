@@ -10,6 +10,7 @@ my @PREFIX = (PREFIX => $ENV{PERL5PREFIX})
 
 my %args = (
 	    @PREFIX,
+	    PREREQ_PM	 => { ObjStore => '1.46' },
 	    NAME         => 'ObjStore::REP::HashRecord',
 	    VERSION_FROM => './HashRecord.pm',
 	    PL_FILES     => { 'gen_lib.PL' => "osp_hashrecord.h librecord.c" },
@@ -33,6 +34,6 @@ package MY;
 sub constants {
     my $str = shift->SUPER::constants;
     $str =~ s/^(BASEEXT) =.*$/
-	"$1 = libHashRecord".ObjStore::REP::HashRecord::API_VERSION() /me;
+	"$1 = libHashRecord" /me;
     $str;
 }

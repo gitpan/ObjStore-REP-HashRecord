@@ -268,6 +268,8 @@ out q[#include <osperl.h>];
 &print_defines;
 out <<END;
 
+#define HASHRECORD_API_VERSION 1
+
 #define OSPV_phrREADONLY	0x0100  /* readonly flag */
 
 struct $Fspec {
@@ -278,6 +280,8 @@ struct $Fspec {
 };
 
 struct $Base : OSPV_Generic {
+  static void version_check(int ver);
+
   virtual char *rep_class(STRLEN *len);
   virtual int get_perl_type();
   virtual void FETCH(SV *key);
@@ -303,6 +307,11 @@ struct $Base : OSPV_Generic {
   virtual void HR_mod_field(osp_pathexam &exam, int xx)=0;
 };
 
+struct hashrecord_version_check {
+  hashrecord_version_check(int ver) { osp_thr::version_check(ver); }
+};
+static hashrecord_version_check _hashrecord_version_check(HASHRECORD_API_VERSION);
+
 #endif
 END
 
@@ -319,6 +328,12 @@ out q[#include "XSUB.h"];
 out "}";
 out q[#include "osp_hashrecord.h"];
 out <<END;
+
+void $Base\::version_check(int ver)
+{
+  if (ver != HASHRECORD_API_VERSION)
+    croak("ObjStore::HashRecord API mismatch (%d != %d); please recompile everything that links with -lHashRecord", HASHRECORD_API_VERSION, ver);
+}
 
 char *$Base\::rep_class(STRLEN *len)
 { *len = 20; return "ObjStore::REP::HashRecord"; }
@@ -358,7 +373,7 @@ struct HR_bridge : osp_smart_object {
   HR_bridge() : cursor(0), fb_cursor(0) {}
   void reset() {
     cursor = 1;
-    if (fb_cursor) { fb_cursor->REF_dec(); fb_cursor = 0; }
+    if (fb_cursor) { fb_cursor->freelist(); fb_cursor = 0; }
   }
   virtual ~HR_bridge() { reset(); }
 };
