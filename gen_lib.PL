@@ -1,5 +1,3 @@
-# Copyright © 1998 Joshua Nathaniel Pritikin.  All rights reserved.
-
 BEGIN { $^W=1; }
 
 use strict;
@@ -74,7 +72,7 @@ sub print_fetch {
 		} elsif ($t =~ m/^osp_str(\d+)$/) {
 		    out "dSP;";
 		    out "if (fp->is_undef())";
-		    indent sub { out "XPUSHs(&sv_undef);" };
+		    indent sub { out "XPUSHs(&PL_sv_undef);" };
 		    out "else {";
 		    indent sub {
 			out "STRLEN len; char *str = fp->get(&len);";
@@ -96,7 +94,7 @@ sub print_fetch {
 	}
 	out "default:";
 	indent sub {
-	    out qq[croak("%s(0x%p)->FETCH: $Fspec type %d unknown", os_class(&na), this, spec->type);];
+	    out qq[croak("%s(0x%p)->FETCH: $Fspec type %d unknown", os_class(&PL_na), this, spec->type);];
 	};
 	out "}";
     };
@@ -113,13 +111,13 @@ sub print_store {
 	out "if (fi < 0) {";
 	indent sub {
 	    out "OSPV_Generic *fb = (OSPV_Generic *) HR_get_fallback();";
-	    out q[if (!fb) croak("Cannot create key '%s' in %s(0x%p)", kstr, os_class(&na), this);];
+	    out q[if (!fb) croak("Cannot create key '%s' in %s(0x%p)", kstr, os_class(&PL_na), this);];
 	    out "fb->STORE(key,nval);";
 	    out "return;";
 	};
 	out "}";
 	out "$Fspec *spec = HR_get_field_spec(fi);";
-	out qq[if (!HR_mod_field(fi)) croak("%s(0x%x): attempt to modify READONLY %s", os_class(&na), this, spec->key);];
+	out qq[if (!HR_mod_field(fi)) croak("%s(0x%x): attempt to modify READONLY %s", os_class(&PL_na), this, spec->key);];
 	out "switch (spec->type) {";
 	for my $t (@T) {
 	    out "case FT_$t:{";
@@ -145,7 +143,7 @@ sub print_store {
 		} elsif ($t =~ m/^double|float$/) {
 		    out "*fp = SvNV(nval);";
 		} elsif ($t =~ m/^char$/) {
-		    out "*fp = *SvPV(nval, na);";
+		    out "*fp = *SvPV(nval, PL_na);";
 		} else {
 		    warn "*** unknown type '$t'";
 		}
@@ -154,7 +152,7 @@ sub print_store {
 	}
 	out "default:";
 	indent sub {
-	    out qq[croak("%s(0x%p)->STORE: $Fspec type %d unknown", os_class(&na), this, spec->type);];
+	    out qq[croak("%s(0x%p)->STORE: $Fspec type %d unknown", os_class(&PL_na), this, spec->type);];
 	};
 	out "}";
     };
@@ -249,7 +247,7 @@ sub print_traverse2 {
 	}
 	out "default:";
 	indent sub {
-	    out qq[croak("%s(0x%p)->traverse2: $Fspec type %d unknown", os_class(&na), this, spec->type);];
+	    out qq[croak("%s(0x%p)->traverse2: $Fspec type %d unknown", os_class(&PL_na), this, spec->type);];
 	};
 	out "}";
 	out "return ret;";
@@ -268,19 +266,21 @@ out q[#include <osperl.h>];
 &print_defines;
 out <<END;
 
-#define HASHRECORD_API_VERSION 1
+#define HASHRECORD_API_VERSION 3
 
 #define OSPV_phrREADONLY	0x0100  /* readonly flag */
 
 struct $Fspec {
+  int id;
   char *key;
   STRLEN keylen;
   int offset;
   int type;
+  char *alias_to;
 };
 
 struct $Base : OSPV_Generic {
-  static void version_check(int ver);
+  static void use(const char *YourName, int ver);
 
   virtual char *rep_class(STRLEN *len);
   virtual int get_perl_type();
@@ -307,11 +307,6 @@ struct $Base : OSPV_Generic {
   virtual void HR_mod_field(osp_pathexam &exam, int xx)=0;
 };
 
-struct hashrecord_version_check {
-  hashrecord_version_check(int ver) { osp_thr::version_check(ver); }
-};
-static hashrecord_version_check _hashrecord_version_check(HASHRECORD_API_VERSION);
-
 #endif
 END
 
@@ -329,10 +324,12 @@ out "}";
 out q[#include "osp_hashrecord.h"];
 out <<END;
 
-void $Base\::version_check(int ver)
+void $Base\::use(const char *YourName, int ver)
 {
+  osp_thr::use("ObjStore::REP::HashRecord", OSPERL_API_VERSION);
   if (ver != HASHRECORD_API_VERSION)
-    croak("ObjStore::HashRecord API mismatch (%d != %d); please recompile everything that links with -lHashRecord", HASHRECORD_API_VERSION, ver);
+    croak("ObjStore::HashRecord API mismatch (%d != %d); please recompile '%s'",
+          HASHRECORD_API_VERSION, ver, YourName);
 }
 
 char *$Base\::rep_class(STRLEN *len)
@@ -359,7 +356,7 @@ void $Base\::DELETE(SV *key)
   char *kstr = SvPV(key, klen);
   if (HR_key_2field(kstr, klen) >= 0) {
     warn("Attempt to delete key '%s' from %s(0x%p) ignored",
-         kstr, os_class(&na), this);
+         kstr, os_class(&PL_na), this);
     return;
   }
   OSPV_Generic *fb = (OSPV_Generic *) HR_get_fallback();

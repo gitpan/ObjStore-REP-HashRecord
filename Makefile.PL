@@ -10,7 +10,7 @@ my @PREFIX = (PREFIX => $ENV{PERL5PREFIX})
 
 my %args = (
 	    @PREFIX,
-	    PREREQ_PM	 => { ObjStore => '1.46' },
+	    PREREQ_PM	 => { ObjStore => '1.52' },
 	    NAME         => 'ObjStore::REP::HashRecord',
 	    VERSION_FROM => './HashRecord.pm',
 	    PL_FILES     => { 'gen_lib.PL' => "osp_hashrecord.h librecord.c" },

@@ -145,8 +145,9 @@ sub generate {
 
     # HEADER FILE
     my @real = grep { !exists $_->{alias} } @$F;
-    my $cnt = @real;
-    my $bset = int ((31+$cnt)/32);
+    my @alias = grep { exists $_->{alias} } @$F;
+    my $cnt = @$F;
+    my $bset = int ((31+@real)/32);
     if ($bset > 4) {
 	warn "too many fields $bset > 128";
 	$bset = 4;
@@ -170,8 +171,10 @@ sub generate {
     print $H <<END;
 
   // HashRecord class info:
-  static int HR_num_fields;
+  static int HR_all_fields, HR_real_fields;
   static $Fspec HR_spec[$cnt];
+  static HV* HR_field_map;
+  static int HR_warn_noise;
 
   // HashRecord methods:
   virtual void make_constant();
@@ -188,14 +191,18 @@ END
     # FIELD SPEC TABLE
     print $C "osp_hashrec_field_spec $class\::HR_spec[$cnt] = {\n  ";
     print $C join(",\n  ",
-		  map { "{ ".join(", ",
-				  '"'.$_->{name}.'"',
+		  map { "{ ".join(', ',
+				  $_->{id},
+				  qq["$_->{name}"],
 				  length $_->{name},
 				  "offsetof($class, $_->{cname})",
-				  "FT_".$_->{type})." }" }
-		  sort { $a->{id} <=> $b->{id} } @real);
+				  "FT_".$_->{type},
+				  $_->{alias}? qq["$_->{alias}"]:0
+				 )." }" }
+		  (sort { $a->{id} <=> $b->{id} } @real), @alias);
     print $C "\n};\n";
-    print $C "int $class\::HR_num_fields = $cnt;\n";
+    print $C "int $class\::HR_all_fields = $cnt;\n";
+    print $C "int $class\::HR_real_fields = ".(0+@real).";\n";
     print $C "\n";
 
     # METHODS
@@ -205,7 +212,7 @@ END
     } else {
 	print $C "{ OSPvFLAGS(this) |= OSPV_phrREADONLY; }\n";
     }
-    print $C "int $class\::HR_get_num_fields() { return HR_num_fields; }\n";
+    print $C "int $class\::HR_get_num_fields() { return HR_real_fields; }\n";
     print $C "$Fspec * $class\::HR_get_field_spec(int xx)\n{ return &HR_spec[xx]; }\n";
     if ($fallback) {
 	print $H "  OSSVPV *HR_get_fallback();\n";
@@ -244,40 +251,31 @@ END
 	print $C "  }\n";
     }
     print $C "}\n";
-    print $C "int $class\::HR_key_2field(char *key, int klen)\n";
-    print $C "{\n";
-    print $C "  if (!klen) klen = strlen(key);\n";
-    print $C "  if (!klen) return -1;\n";
-    print $C "  switch (key[0]) {\n";
-    my %k;
-    for (@$F) { ++ $k{ substr($_->{name},0,1) } }
-    delete $k{'_'};
-    for my $start (sort keys %k) {
-	print $C "  case '$start':\n";
-	my @case = grep { $_->{name} =~ m/^$start/ } @$F;
-	for (sort { $a->{len} <=> $b->{len} } @case) {
-	    my $x = $_->{id};
-	    if (! $_->{alias}) {
-		print $C "    if (klen == $_->{len} && memcmp(key, HR_spec[$x].key, $_->{len}) == 0) return $x;\n";
-	    } else {
-		print $C qq[    if (klen == $_->{len} && memcmp(key, "$_->{name}", $_->{len}) == 0) {\n];
-		print $C qq[      warn("Please use '$_->{alias}' instead of '$_->{name}'");\n];
-		print $C "      return $x;\n";
-		print $C "    }\n";
-	    }
-	}
-	print $C "    break;\n";
-    }
-    print $C "  }\n";
-    print $C "  return -1;\n";
-    print $C "}\n";
+    print $C "HV* $class\::HR_field_map=0;\n";
+    print $C "int $class\::HR_warn_noise=7;\n";
+    print $C qq[
+int $class\::HR_key_2field(char *key, int klen)
+{
+  if (!klen) klen = strlen(key);
+  if (!HR_field_map) {
+      HR_field_map = newHV();
+      for (int xx=0; xx < HR_all_fields; xx++) {
+	  hv_store(HR_field_map, HR_spec[xx].key, HR_spec[xx].keylen,
+		   newSViv(xx), 0);
+      }
+  }
+  SV **sv = hv_fetch(HR_field_map, key, klen, 0);
+  if (!sv) return -1;
+  int ret = SvIVX(*sv);
+  if (HR_spec[ret].alias_to && --$class\::HR_warn_noise > 0)
+      warn("Please use '%s' instead of '%s'",
+	   HR_spec[ret].alias_to, HR_spec[ret].key);
+  return HR_spec[ret].id;
+}
+];
     print $C "\n";
 }
 
 # verify binary footprint size < 1-5k per class
-
-
-
-# Copyright © 1998 Joshua Nathaniel Pritikin.  All rights reserved.
 
 __END__;
