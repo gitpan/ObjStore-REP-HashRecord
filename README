@@ -1,0 +1,44 @@
+
+PREREQUISITES:
+
+  ObjStore 1.42 (or better)
+
+  perl 5.005 (5.004_05 might be okay)
+
+
+WHAT THE HECK IS THIS?
+
+  A code generator for highly optimized databases.
+
+
+DESCRIPTION:
+
+The achievement of top database efficiency demands the use of C++ to
+optimize space requirements and access times of perl data.
+Unfortunately, once we step down from perl to C++ things get
+complicated.
+
+Suddenly, each database brings with it the baggage of an application
+specific schema and the corresponding C++ support code.  Even worse,
+as new versions are developed all the schemas and code from prior
+versions must continue to be supported or old data will become much
+less convenient to access.  Another alternative, schema evolution, is
+an enormous amount of trouble and should be possible to avoid or at
+least easy to postpone.  The new dump and load facility introduced
+with OS 5.1 is a help, but it doesn't squarely address the same
+problem.
+
+We need to balance two opposing desires:
+
+1. Optimize data using customized C++ objects.
+
+2. Try to minimize the bulk of schema and object code needed for
+ongoing backward compatibility.
+
+
+NOTES:
+
+Virtual methods are great because they are class specific, yet the
+database don't care about them.  Never underestimate the usefulness of
+being able to change virtual methods.  You should arrange your
+inheritance tree to maximize the opportunity for virtual methods.
