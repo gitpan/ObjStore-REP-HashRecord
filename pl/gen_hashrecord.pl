@@ -57,11 +57,16 @@ for (c_types) { $T{$_} = 1 }
 
 my %opt = (readonly => 0, index => 1);
 my $Class;
+my $NextId;
 my $fallback;
 my @F;
 my $l;
 while ($l = <$rec>) {
-    if ($l =~ m/$class_RE (\w+) \s [^;\{]* \{ /x) { $Class = $2; next }
+    if ($l =~ m/$class_RE (\w+) \s [^;\{]* \{ /x) {
+	$Class = $2;
+	$NextId = 0;
+	next
+    }
     if ($l =~ m/^\}\;/) {
 	if (! @F) {
 #	    warn "$Class has no recognizable fields (ignored)";
@@ -88,13 +93,31 @@ while ($l = <$rec>) {
     next if !$Class;
     next if $l =~ m/^\s*$/;
 
+    if ($l =~ /^alias: \s+ (\w+) \s+ (\w+) \s* $/x) {
+	my ($one,$to) = ($1,$2);
+	my $ok=0;
+	for my $f (@F) {
+	    next if $f->{name} ne $to;
+	    my %copy = %$f;
+	    delete $copy{'align'};
+	    delete $copy{'text'};
+	    push @F, { %copy, name => $one, len => length $one, alias => $to };
+	    $ok=1;
+	    last;
+	}
+	$l = '';
+	warn "alias: '$to' not found (ignored)"
+	    if !$ok;
+	next;
+    }
+
     my @l = split /\s+/, $l;
     shift @l if !length $l[0];
     $l[0] =~ s/^I(\d+)$/os_int$1/;
     next if (!exists $T{ $l[0] } or
 	     $l[1] !~ s/^ (\w+) (\;)? $/$1/x);
     my $rest = join(' ', @l[2..$#l]);
-    my $id = @F;
+    my $id = $NextId++;
     my $name = $l[1];
     $name = $1 if $rest =~ /\b rename\: \s (\w+) \b/x;
     $fallback = $l[1] if $name eq 'FALLBACK' && $l[0] eq 'OSPVptr';
@@ -114,7 +137,8 @@ sub generate {
     my ($class,$F) = @_;
 
     # HEADER FILE
-    my $cnt = @$F;
+    my @real = grep { !exists $_->{alias} } @$F;
+    my $cnt = @real;
     my $bset = int ((31+$cnt)/32);
     if ($bset > 4) {
 	warn "too many fields $bset > 128";
@@ -123,8 +147,8 @@ sub generate {
     print $H "// HR fields:\n";
 
     # re-order fields as little as possible
-    for (my $al = max map { $_->{align} } @$F; $al > 0; $al--) {
-	for (grep { $_->{align} == $al } @$F) {
+    for (my $al = max map { $_->{align} } @real; $al > 0; $al--) {
+	for (grep { $_->{align} == $al } @real) {
 	    print $H $_->{text};
 	}
 	if ($al == 4) {
@@ -154,14 +178,14 @@ sub generate {
 END
 
     # FIELD SPEC TABLE
-    print $C "osp_hashrec_field_spec $class\::HR_spec[] = {\n  ";
+    print $C "osp_hashrec_field_spec $class\::HR_spec[$cnt] = {\n  ";
     print $C join(",\n  ",
 		  map { "{ ".join(", ",
 				  '"'.$_->{name}.'"',
 				  length $_->{name},
 				  "(int) &(($class *)0)->$_->{cname}",
 				  "FT_".$_->{type})." }" }
-		  @$F);
+		  sort { $a->{id} <=> $b->{id} } @real);
     print $C "\n};\n";
     print $C "int $class\::HR_num_fields = $cnt;\n";
     print $C "\n";
@@ -217,12 +241,20 @@ END
     print $C "  switch (key[0]) {\n";
     my %k;
     for (@$F) { ++ $k{ substr($_->{name},0,1) } }
+    delete $k{'_'};
     for my $start (sort keys %k) {
 	print $C "  case '$start':\n";
 	my @case = grep { $_->{name} =~ m/^$start/ } @$F;
 	for (sort { $a->{len} <=> $b->{len} } @case) {
 	    my $x = $_->{id};
-	    print $C "    if (klen == $_->{len} && memcmp(key, HR_spec[$x].key, $_->{len}) == 0) return $x;\n";
+	    if (! $_->{alias}) {
+		print $C "    if (klen == $_->{len} && memcmp(key, HR_spec[$x].key, $_->{len}) == 0) return $x;\n";
+	    } else {
+		print $C qq[    if (klen == $_->{len} && memcmp(key, "$_->{name}", $_->{len}) == 0) {\n];
+		print $C qq[      warn("Please use '$_->{name}' instead of '$_->{alias}'");\n];
+		print $C "      return $x;\n";
+		print $C "    }\n";
+	    }
 	}
 	print $C "    break;\n";
     }
@@ -232,15 +264,6 @@ END
     print $C "\n";
 }
 
-# key fallback?
-
-# generate
-#   Makefile.PL
-#   module.xs
-#     tables & code
-#     new method
-#   module.sch
-
 # verify binary footprint size < 1-5k per class
 
 
@@ -248,35 +271,3 @@ END
 # Copyright © 1998 Joshua Nathaniel Pritikin.  All rights reserved.
 
 __END__;
-
-map from "key" -> table
-table [key, offset, type]
-
-
-MODULE = E::Xserver		PACKAGE = E::Icache::Ent
-
-static void
-E__Icache__Ent::new(near)
-	SV *near;
-	PPCODE:
-	SV *CLV = ST(0);
-	os_segment *area = osp_thr::sv_2segment(ST(1));
-	PUTBACK;
-	(new(area, E__Icache__Ent::get_os_typespec()) E__Icache__Ent())
-	  ->bless(CLV);
-	return;
-
-
-MODULE = E::Xserver		PACKAGE = E::Basket::Ent
-
-static void
-E__Basket__Ent::new(near)
-	SV *near;
-	PPCODE:
-	SV *CLV = ST(0);
-	os_segment *area = osp_thr::sv_2segment(ST(1));
-	PUTBACK;
-	(new(area, E__Basket__Ent::get_os_typespec()) E__Basket__Ent())
-	  ->bless(CLV);
-	return;
-

@@ -35,10 +35,3 @@ We need to balance two opposing desires:
 2. Try to minimize the bulk of schema and object code needed for
 ongoing backward compatibility.
 
-
-NOTES:
-
-Virtual methods are great because they are class specific, yet the
-database don't care about them.  Never underestimate the usefulness of
-being able to change virtual methods.  You should arrange your
-inheritance tree to maximize the opportunity for virtual methods.

@@ -3,7 +3,7 @@ package ObjStore::REP::HashRecord;
 use base 'Exporter';
 use ObjStore::MakeMaker qw(add_os_args);
 use vars qw($VERSION @EXPORT_OK $Fspec %align);
-$VERSION = '0.51';
+$VERSION = '0.52';
 @EXPORT_OK = qw($VERSION &API_VERSION &hrec_args &c_types $Fspec %align);
 
 sub API_VERSION() { '01' };     #do not edit!!

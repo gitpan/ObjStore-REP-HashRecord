@@ -72,8 +72,9 @@ sub print_fetch {
 		    out "dSP;";
 		    out "XPUSHs(sv_2mortal(newSViv(*fp)));";
 		} elsif ($t =~ m/^osp_str(\d+)$/) {
+		    out "STRLEN len; char *str = fp->get(&len);";
 		    out "dSP;";
-		    out "XPUSHs(sv_2mortal(fp->svcopy()));";
+		    out "XPUSHs(len? sv_2mortal(newSVpvn(str,len)) : &PL_sv_no);";
 		} elsif ($t =~ m/^double|float$/) {
 		    out "dSP;";
 		    out "XPUSHs(sv_2mortal(newSVnv(*fp)));";
@@ -89,7 +90,7 @@ sub print_fetch {
 	}
 	out "default:";
 	indent sub {
-	    out qq[croak("$Base\::FETCH: $Fspec type %d unknown", spec->type);];
+	    out qq[croak("%s(0x%p)->FETCH: $Fspec type %d unknown", os_class(&na), this, spec->type);];
 	};
 	out "}";
     };
@@ -106,13 +107,13 @@ sub print_store {
 	out "if (fi < 0) {";
 	indent sub {
 	    out "OSPV_Generic *fb = (OSPV_Generic *) HR_get_fallback();";
-	    out q[if (!fb) croak("Cannot create key '%s' in HashRecord", kstr);];
+	    out q[if (!fb) croak("Cannot create key '%s' in %s(0x%p)", kstr, os_class(&na), this);];
 	    out "fb->STORE(key,nval);";
 	    out "return;";
 	};
 	out "}";
 	out "$Fspec *spec = HR_get_field_spec(fi);";
-	out qq[if (!HR_mod_field(fi)) croak("HashRecord: attempt to modify READONLY %s", spec->key);];
+	out qq[if (!HR_mod_field(fi)) croak("%s(0x%x): attempt to modify READONLY %s", os_class(&na), this, spec->key);];
 	out "switch (spec->type) {";
 	for my $t (@T) {
 	    out "case FT_$t:{";
@@ -126,7 +127,9 @@ sub print_store {
 		} elsif ($t =~ m/^ os_int(\d+) $/x) {
 		    out "*fp = SvIV(nval);";
 		} elsif ($t =~ m/^osp_str(\d+)$/) {
-		    out "*fp = nval;";
+		    out "STRLEN len; char *pv = SvPV(nval, len);";
+		    out qq[if (len > $1) warn("truncating string from length %d to %d", len, $1);];
+		    out "fp->set(pv,len);";
 		} elsif ($t =~ m/^double|float$/) {
 		    out "*fp = SvNV(nval);";
 		} elsif ($t =~ m/^char$/) {
@@ -139,7 +142,7 @@ sub print_store {
 	}
 	out "default:";
 	indent sub {
-	    out qq[croak("$Base\::STORE: $Fspec type %d unknown", spec->type);];
+	    out qq[croak("%s(0x%p)->STORE: $Fspec type %d unknown", os_class(&na), this, spec->type);];
 	};
 	out "}";
     };
@@ -228,7 +231,7 @@ sub print_traverse2 {
 	}
 	out "default:";
 	indent sub {
-	    out qq[croak("$Base\::traverse2: $Fspec type %d unknown", spec->type);];
+	    out qq[croak("%s(0x%p)->traverse2: $Fspec type %d unknown", os_class(&na), this, spec->type);];
 	};
 	out "}";
 	out "return ret;";
@@ -262,6 +265,7 @@ struct $Base : OSPV_Generic {
   virtual void FETCH(SV *key);
   virtual void STORE(SV *key, SV *value);
   virtual int EXISTS(SV *key);
+  virtual void DELETE(SV *key);
   virtual void FIRST(osp_smart_object **);
   virtual void NEXT(osp_smart_object **);
   virtual OSSVPV *traverse1(osp_pathexam &exam);
@@ -316,6 +320,20 @@ int $Base\::EXISTS(SV *key)
   return fb->EXISTS(key);
 }
 
+void $Base\::DELETE(SV *key)
+{
+  STRLEN klen;
+  char *kstr = SvPV(key, klen);
+  if (HR_key_2field(kstr, klen) >= 0) {
+    warn("Attempt to delete key '%s' from %s(0x%p) ignored",
+         kstr, os_class(&na), this);
+    return;
+  }
+  OSPV_Generic *fb = (OSPV_Generic *) HR_get_fallback();
+  if (!fb) return;
+  fb->DELETE(key);
+}
+
 struct HR_bridge : osp_smart_object {
   int cursor;
   osp_smart_object *fb_cursor; //for fallback!
@@ -329,6 +347,7 @@ struct HR_bridge : osp_smart_object {
 
 void $Base\::FIRST(osp_smart_object **info)
 {
+  assert(info);
   if (! *info) *info = new HR_bridge;
   HR_bridge *br = (HR_bridge*) *info;
   br->reset();
@@ -340,6 +359,7 @@ void $Base\::FIRST(osp_smart_object **info)
 
 void $Base\::NEXT(osp_smart_object **info)
 {
+  assert(info);
   assert(*info);
   HR_bridge *br = (HR_bridge*) *info;
   if (br->cursor < HR_get_num_fields()) {

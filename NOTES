@@ -5,7 +5,8 @@ notes.  This may seem like a complicated, detailed mess, but the
 performance is outstanding!  8-)
 
 
-1. Your structures must inherit from OSPV_HashRecord.
+1. Your structures must inherit from OSPV_HashRecord.  Be aware that
+you may no longer be able to store 'undef' in some field types.
 
 
 2. You probably want a super-class to identify a family of implementations.
@@ -14,6 +15,11 @@ performance is outstanding!  8-)
    Zot_Impl2   |
    Zot_Impl3   |
    Zot_Impl4 -/
+
+Virtual methods are great because they are class specific, yet the
+database don't care about them.  Never underestimate the usefulness of
+being able to change virtual methods.  You should arrange your
+inheritance tree to maximize the opportunity for virtual methods.
 
 
 3. Your Makefile.PL should include at least:
@@ -89,3 +95,17 @@ use base 'ObjStore::HV';
 
 
 8. Test!!
+
+
+9. Undocumented features:
+
+- Keys beginning with '_' are not accessable from perl.
+
+- OSPVptr FALLBACK is searched in the case that a key is not found.
+This allows fast, compact storage of commonly used fields with the
+flexibility of a generic schema.
+
+- // rename: new_field_name
+
+- alias: foo bar
+
