@@ -40,7 +40,7 @@ sub MY::postamble {
 
 
 4. A XS file needs to implement the default 'new' method.  It should
-look like this:
+look something like below.  You might name it 'allocate' instead.
 
 void
 new(CSV, seg)

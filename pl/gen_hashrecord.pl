@@ -150,7 +150,7 @@ sub generate {
   virtual void HR_mod_field(osp_pathexam &exam, int xx);
 
   // you must implement:
-  virtual char *os_class(STRLEN *len);
+  //virtual char *os_class(STRLEN *len);
 END
 
     # FIELD SPEC TABLE

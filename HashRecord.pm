@@ -3,7 +3,7 @@ package ObjStore::REP::HashRecord;
 use base 'Exporter';
 use ObjStore::MakeMaker qw(add_os_args);
 use vars qw($VERSION @EXPORT_OK $Fspec %align);
-$VERSION = '0.5';
+$VERSION = '0.51';
 @EXPORT_OK = qw($VERSION &API_VERSION &hrec_args &c_types $Fspec %align);
 
 sub API_VERSION() { '01' };     #do not edit!!
@@ -33,9 +33,10 @@ sub c_types() {
     @T
 }
 
+# These cannot change either!
 %align = (OSSV => 8, OSPVptr => 4, char => 1, float => 4, double => 8,
 	   os_int16 => 2, os_int32 => 4, os_reference => 4,
-	   os_reference_this_DB => 8);
+	   os_reference_this_DB => 4);
 for (my $w=3; $w <= $max_osp_str; $w+=4) { $align{"osp_str$w"} = 4 }
 
 1;
